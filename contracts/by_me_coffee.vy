@@ -15,11 +15,14 @@ interface AggregatorV3Interface:
 
 minimum_usd: uint256
 price_feed: AggregatorV3Interface
+owner: address
 
 @deploy
 def __init__(price_feed_address: address):
-    self.minimum_usd = 5
+    # address: 0x694AA1769357215DE4FAC081bf1f309aDC325306
+    self.minimum_usd = as_wei_value(5,"ether")
     self.price_feed = AggregatorV3Interface(price_feed_address)
+    self.owner = msg.sender
 
 
 @external
@@ -32,29 +35,41 @@ def fund():
     How do we convert the ETH amount to dollars amount?
     """
 
-    pass
+    usd_value_of_eth:uint256 = self.get_eth_to_usd_rate(msg.value)
+
+    assert usd_value_of_eth >= self.minimum_usd , "You must send more ETH!!"
 
 @external
 def withdraw():
-    pass
+
+    """
+    Take the money out of this contract, that people sent via fund function
+    How do we make sure only we can pull the money out?
+    """
+    assert msg.sender == self.owner , "You must be the owner to withdraw money from this contract"
 
 @internal
-def _get_eth_to_usd_rate():
-    # We need the address of Sepolia Tesnet 0x694AA1769357215DE4FAC081bf1f309aDC325306
-    # We need the ABI (It tell us how to interact with the contract)
-    pass
-
-@external
 @view
-def get_price(eth_amount:uint256)-> int256:
+def get_eth_to_usd_rate(eth_amount:uint256)-> uint256:
 
     a: uint80 = 0
     price: int256 = 0
     b: uint256 = 0
     c: uint256 = 0
     d: uint80 = 0
-    (a, price, b, c, d) = staticcall self.price_feed.latestRoundData()
+    (a, price, b, c, d) = staticcall self.price_feed.latestRoundData() #3365.51000000
+    # 8 decimals
+    # $3,021
+    #eth amount in usd
+    eth_price : uint256 = convert(price,uint256) * (10**10) # the end of this line is adding 10 zeros at the end of the number 336551000000 -> 3365510000000000000000
 
-    eth_price : uint256 = convert(price,uint256) * (10**10)
+    #ETH: 11000000000000000
+    # $ / ETH : 3365510000000000000000
+    # integer division removes all decimals
+    eth_amount_in_usd: uint256= (eth_amount * eth_price) // (1 * (10**18)) # it represents 18 decimal places
+    return eth_amount_in_usd
 
-    return price
+@external
+@view
+def get_eth_to_usd(eth_amount:uint256) -> uint256:
+    return self.get_eth_to_usd_rate(eth_amount)
