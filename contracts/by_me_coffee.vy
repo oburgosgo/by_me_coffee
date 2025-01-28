@@ -16,6 +16,9 @@ interface AggregatorV3Interface:
 minimum_usd: uint256
 price_feed: AggregatorV3Interface
 owner: address
+funders: DynArray[address,1000]
+funder_to_amount_funded: HashMap[address,uint256]
+
 
 @deploy
 def __init__(price_feed_address: address):
@@ -39,6 +42,10 @@ def fund():
 
     assert usd_value_of_eth >= self.minimum_usd , "You must send more ETH!!"
 
+    self.funders.append(msg.sender)
+
+    self.funder_to_amount_funded[msg.sender] += msg.value
+
 @external
 def withdraw():
 
@@ -47,6 +54,12 @@ def withdraw():
     How do we make sure only we can pull the money out?
     """
     assert msg.sender == self.owner , "You must be the owner to withdraw money from this contract"
+    send(self.owner, self.balance)
+
+    for funder: address in self.funders:
+        self.funder_to_amount_funded[funder] = 0  # It will cost a lot of gas
+
+    self.funders = []
 
 @internal
 @view
